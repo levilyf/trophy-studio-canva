@@ -62,34 +62,21 @@ function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
     }];
   }
   const topWidth=px(s.top), inset=(w-topWidth)/2;
-  const p1=[inset,0],p2=[inset+topWidth,0],p3=[w,h],p4=[0,h];
-  const linePoly=(a:number[],b:number[])=>{
-    const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
-    const ox=-dy/len*stroke/2,oy=dx/len*stroke/2;
-    return [[a[0]+ox,a[1]+oy],[b[0]+ox,b[1]+oy],[b[0]-ox,b[1]-oy],[a[0]-ox,a[1]-oy]];
-  };
-  return [[p1,p2],[p2,p3],[p3,p4],[p4,p1]].map(pair=>{
-    const el=polygonElement(linePoly(pair[0],pair[1]));
-    return {...el,top:el.top+y,left:el.left+x};
-  });
+  return [{
+    type:"shape",
+    top:y,left:x,width:w,height:h,
+    viewBox:{top:0,left:0,width:w,height:h},
+    paths:[{
+      d:`M ${inset} 0 L ${inset+topWidth} 0 L ${w} ${h} L 0 ${h} Z`,
+      fill:{dropTarget:false,color:"#ffffff"},
+      stroke:outline,
+    }],
+  }];
 }
 function makeShapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
   const elements=shapeElements(s,x,y,stroke);
   const w=px(s.bottom),h=px(s.height);
-  const output:any[]=[];
-  if(s.kind==="Trapezium") {
-    output.push({
-      type:"group",
-      top:y,left:x,width:w,height:h,
-      children:elements.map(element=>({
-        ...element,
-        top:element.top-y,
-        left:element.left-x,
-      })),
-    });
-  } else {
-    output.push(...elements);
-  }
+  const output:any[]=[...elements];
   if(s.label) output.push({
     type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,
     fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"
@@ -146,7 +133,7 @@ export const App = () => {
      await addPage({title:`Bharath Sports · ${pageIndex+1}`,elements:pages[pageIndex]});
     }
    }
-   setStatus(`Export complete. ${shapes.length} shapes placed across ${pages.length} page(s). Rectangles and circles are single editable shapes; each trapezium side and each center label is separate and editable.`);
+   setStatus(`Export complete. ${shapes.length} shapes placed across ${pages.length} page(s). Each outline is one selectable Canva shape; center labels remain separately editable.`);
   }catch(error){setStatus("Export stopped: "+(error instanceof Error?error.message:String(error)));}
   finally{setBusy(false);}
  };
@@ -165,6 +152,6 @@ export const App = () => {
    <button className="primary" onClick={addShape}>Add shape</button>
   </section>
   <section className="panel"><h2>2. Page layout · {shapes.length} shapes</h2><div className="preview">{shapes.length?shapes.map((s,i)=><div className="item" key={s.id}><span>{i+1}. {s.kind} · {s.bottom} × {s.height} cm{s.label?" · "+s.label:""}</span><button className="remove" onClick={()=>remove(s.id)}>Remove</button></div>):"Your shapes will appear here."}</div><p className="note">Dimensions convert from centimetres to Canva pixels (96 px per inch). Elements are packed into rows using the current page dimensions. When a page fills, the remaining shapes continue automatically on new Canva pages.</p></section>
-  <section className="panel"><h2>3. Canva export</h2><p className="note">Adds editable shapes to the current Canva design. Rectangles and circles are single shape elements. Each trapezium side and center label is independent. Overflow continues onto new pages automatically.</p><button className="primary" disabled={!shapes.length||busy||!canAdd} onClick={exportAll}>{busy?"Exporting…":"Add to Canva"}</button>{!canAdd&&<p className="note">This Canva design type does not support adding positioned elements.</p>}{status&&<p className="status" role="status">{status}</p>}</section>
+  <section className="panel"><h2>3. Canva export</h2><p className="note">Adds editable shapes to the current Canva design. Each rectangle, circle, and trapezium is one selectable shape. Center text remains separately editable. Overflow continues onto new pages automatically.</p><button className="primary" disabled={!shapes.length||busy||!canAdd} onClick={exportAll}>{busy?"Exporting…":"Add to Canva"}</button>{!canAdd&&<p className="note">This Canva design type does not support adding positioned elements.</p>}{status&&<p className="status" role="status">{status}</p>}</section>
  </div>;
 };
