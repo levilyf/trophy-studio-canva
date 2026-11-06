@@ -23,33 +23,63 @@ input{width:100%;background:#222;color:white;border:1px solid #444;border-radius
 .remove{background:transparent;border:0;color:#aaa}.note{font-size:11px;color:#999;line-height:1.5}.status{font-size:12px;color:#ddd;margin-top:10px}
 `;
 
-function polygonElement(points:number[][], strokeColor="#222222") {
+function polygonElement(points:number[][], originX:number, originY:number, fillColor="#222222") {
   const xs=points.map(p=>p[0]), ys=points.map(p=>p[1]);
   const left=Math.min(...xs), top=Math.min(...ys);
-  const width=Math.max(...xs)-left, height=Math.max(...ys)-top;
+  const width=Math.max(1,Math.max(...xs)-left), height=Math.max(1,Math.max(...ys)-top);
   const path="M "+points.map(([x,y])=>(x-left)+" "+(y-top)).join(" L ")+" Z";
-  return {type:"shape" as const,left,top,width,height,viewBox:{left:0,top:0,width,height},paths:[{d:path,fill:{color:strokeColor}}]};
+  return {
+    type:"shape" as const,
+    top:originY+top,
+    left:originX+left,
+    width,
+    height,
+    viewBox:{left:0,top:0,width,height},
+    paths:[{d:path,fill:{color:fillColor}}],
+  };
 }
+
+function outlineShape(x:number,y:number,width:number,height:number,path:string,stroke:number) {
+  return {
+    type:"shape" as const,
+    top:y,
+    left:x,
+    width,
+    height,
+    viewBox:{left:0,top:0,width,height},
+    paths:[{
+      d:path,
+      fill:{dropTarget:false},
+      stroke:{weight:stroke,color:"#222222"},
+    }],
+  };
+}
+
 function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
   const w=px(s.bottom),h=px(s.height);
   if(s.kind==="Rectangle") {
-    return [{type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:`M 0 0 H ${w} V ${h} H 0 Z M ${stroke} ${stroke} V ${h-stroke} H ${w-stroke} V ${stroke} Z`,fill:{color:"#222222"}}]}];
+    // One valid closed path, with an actual stroke instead of an invalid two-contour fill.
+    return [outlineShape(x,y,w,h,`M 0 0 H ${w} V ${h} H 0 Z`,stroke)];
   }
   if(s.kind==="Circle") {
-    const r=w/2,t=stroke,inner=Math.max(0,r-t);
-    return [{type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:`M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${2*r} A ${r} ${r} 0 1 1 ${r} 0 Z M ${r} ${t} A ${inner} ${inner} 0 1 0 ${r} ${2*r-t} A ${inner} ${inner} 0 1 0 ${r} ${t} Z`,fill:{color:"#222222"}}]}];
+    // Canva shape paths allow one M command per path. Two arcs close the circle.
+    const r=Math.min(w,h)/2;
+    const path=`M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${h} A ${r} ${r} 0 1 1 ${r} 0 Z`;
+    return [outlineShape(x,y,w,h,path,stroke)];
   }
+
   const topWidth=px(s.top), inset=(w-topWidth)/2;
   const p1=[inset,0],p2=[inset+topWidth,0],p3=[w,h],p4=[0,h];
   const linePoly=(a:number[],b:number[])=>{
     const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
-    const ox=-dy/len*stroke/2,oy=dx/len*stroke/2;
+    const thickness=Math.max(stroke,4);
+    const ox=-dy/len*thickness/2,oy=dx/len*thickness/2;
     return [[a[0]+ox,a[1]+oy],[b[0]+ox,b[1]+oy],[b[0]-ox,b[1]-oy],[a[0]-ox,a[1]-oy]];
   };
-  return [[p1,p2],[p2,p3],[p3,p4],[p4,p1]].map(pair=>{
-    const el=polygonElement(linePoly(pair[0],pair[1]));
-    return {...el,top:el.top+y,left:el.left+x};
-  });
+  // Four separate closed polygons: each side is an independent Canva element.
+  return [[p1,p2],[p2,p3],[p3,p4],[p4,p1]].map(pair=>
+    polygonElement(linePoly(pair[0],pair[1]),x,y)
+  );
 }
 function makeShapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
   const elements=shapeElements(s,x,y,stroke);
