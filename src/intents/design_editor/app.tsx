@@ -23,31 +23,39 @@ input{width:100%;background:#222;color:white;border:1px solid #444;border-radius
 .remove{background:transparent;border:0;color:#aaa}.note{font-size:11px;color:#999;line-height:1.5}.status{font-size:12px;color:#ddd;margin-top:10px}
 `;
 
-function shapePath(points:number[][]) {
-  return "M "+points.map(p=>p.join(" ")).join(" L ")+" Z";
+function polygonElement(points:number[][], strokeColor="#222222") {
+  const xs=points.map(p=>p[0]), ys=points.map(p=>p[1]);
+  const left=Math.min(...xs), top=Math.min(...ys);
+  const width=Math.max(...xs)-left, height=Math.max(...ys)-top;
+  const path="M "+points.map(([x,y])=>(x-left)+" "+(y-top)).join(" L ")+" Z";
+  return {type:"shape" as const,left,top,width,height,viewBox:{left:0,top:0,width,height},paths:[{d:path,fill:{color:strokeColor}}]};
 }
-function outlineChildren(s:Shape, stroke:number) {
-  const w=px(s.bottom), h=px(s.height), t=stroke;
-  if(s.kind==="Rectangle") return [
-    {type:"shape" as const,top:0,left:0,width:w,height:t,viewBox:{top:0,left:0,width:w,height:t},paths:[{d:shapePath([[0,0],[w,0],[w,t],[0,t]]),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:0,left:0,width:t,height:h,viewBox:{top:0,left:0,width:t,height:h},paths:[{d:shapePath([[0,0],[t,0],[t,h],[0,h]]),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:h-t,left:0,width:w,height:t,viewBox:{top:0,left:0,width:w,height:t},paths:[{d:shapePath([[0,0],[w,0],[w,t],[0,t]]),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:0,left:w-t,width:t,height:h,viewBox:{top:0,left:0,width:t,height:h},paths:[{d:shapePath([[0,0],[t,0],[t,h],[0,h]]),fill:{color:"#222222"}}]}
-  ];
-  const top=px(s.top), inset=(w-top)/2;
-  const leftSide= Math.sqrt(h*h+inset*inset);
-  const leftPoly=[[0,0],[inset,0],[inset+t* h/leftSide,t*inset/leftSide],[0,h]];
-  const rightPoly=[[inset+top,0],[w,0],[w,h],[inset+top-t*h/leftSide,h-t*inset/leftSide]];
-  return [
-    {type:"shape" as const,top:0,left:inset,width:top,height:t,viewBox:{top:0,left:0,width:top,height:t},paths:[{d:shapePath([[0,0],[top,0],[top,t],[0,t]]),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:0,left:0,width:inset+t,height:h,viewBox:{top:0,left:0,width:inset+t,height:h},paths:[{d:shapePath(leftPoly),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:h-t,left:0,width:w,height:t,viewBox:{top:0,left:0,width:w,height:t},paths:[{d:shapePath([[0,0],[w,0],[w,t],[0,t]]),fill:{color:"#222222"}}]},
-    {type:"shape" as const,top:0,left:inset+top-t,width:w-inset-top+t,height:h,viewBox:{top:0,left:0,width:w-inset-top+t,height:h},paths:[{d:shapePath(rightPoly.map(([x,y])=>[x-(inset+top-t),y])),fill:{color:"#222222"}}]}
-  ];
+function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
+  const w=px(s.bottom),h=px(s.height);
+  if(s.kind==="Rectangle") {
+    return [{type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:`M 0 0 H ${w} V ${h} H 0 Z M ${stroke} ${stroke} V ${h-stroke} H ${w-stroke} V ${stroke} Z`,fill:{color:"#222222"}}]}];
+  }
+  if(s.kind==="Circle") {
+    const r=w/2,t=stroke,inner=Math.max(0,r-t);
+    return [{type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:`M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${2*r} A ${r} ${r} 0 1 1 ${r} 0 Z M ${r} ${t} A ${inner} ${inner} 0 1 0 ${r} ${2*r-t} A ${inner} ${inner} 0 1 0 ${r} ${t} Z`,fill:{color:"#222222"}}]}];
+  }
+  const topWidth=px(s.top), inset=(w-topWidth)/2;
+  const p1=[inset,0],p2=[inset+topWidth,0],p3=[w,h],p4=[0,h];
+  const linePoly=(a:number[],b:number[])=>{
+    const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
+    const ox=-dy/len*stroke/2,oy=dx/len*stroke/2;
+    return [[a[0]+ox,a[1]+oy],[b[0]+ox,b[1]+oy],[b[0]-ox,b[1]-oy],[a[0]-ox,a[1]-oy]];
+  };
+  return [[p1,p2],[p2,p3],[p3,p4],[p4,p1]].map(pair=>{
+    const el=polygonElement(linePoly(pair[0],pair[1]));
+    return {...el,top:el.top+y,left:el.left+x};
+  });
 }
-function circlePath(r:number,t:number) {
-  const inner=Math.max(0,r-t);
-  return `M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${2*r} A ${r} ${r} 0 1 1 ${r} 0 Z M ${r} ${t} A ${inner} ${inner} 0 1 0 ${r} ${2*r-t} A ${inner} ${inner} 0 1 0 ${r} ${t} Z`;
+function makeShapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
+  const elements=shapeElements(s,x,y,stroke);
+  const w=px(s.bottom),h=px(s.height);
+  if(s.label) elements.push({type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"});
+  return elements;
 }
 
 export const App = () => {
@@ -64,39 +72,46 @@ export const App = () => {
  };
  const exportAll=async()=>{
   if(!shapes.length||!canAdd)return;
-  setBusy(true);setStatus("Checking Canva page dimensions…");
+  setBusy(true);setStatus("Calculating page layout…");
   try{
-   const pageContext = await getCurrentPageContext();
-   const dimensions = pageContext.dimensions;
-   if (!dimensions) throw new Error("This design has no fixed page dimensions. Open a presentation or another fixed-size design.");
-   const margin=40,gap=36,stroke=px(0.08);
+   const pageContext=await getCurrentPageContext();
+   const dimensions=pageContext.dimensions;
+   if(!dimensions) throw new Error("This design has no fixed page dimensions. Open a fixed-size Canva design.");
+   const margin=40,gap=24,stroke=px(0.08);
    const pageWidth=dimensions.width,pageHeight=dimensions.height;
+   const placements=shapes.map(shape=>({shape,width:px(shape.bottom),height:px(shape.height)}));
+   for(const item of placements){
+    if(item.width>pageWidth-margin*2||item.height>pageHeight-margin*2)
+     throw new Error(`A ${item.shape.kind.toLowerCase()} (${item.shape.bottom} × ${item.shape.height} cm) is larger than the usable page area.`);
+   }
+   const pages:any[][]=[];
+   let current:any[]=[];
    let x=margin,y=margin,rowHeight=0;
-   const placements = shapes.map((shape) => ({ shape, width:px(shape.bottom), height:px(shape.height) }));
-   for (const item of placements) {
-     if (item.width > pageWidth - margin*2 || item.height > pageHeight - margin*2) {
-       throw new Error(`A ${item.shape.kind.toLowerCase()} (${item.shape.bottom} × ${item.shape.height} cm) is larger than the available page area.`);
-     }
-   }
-   setStatus("Adding editable elements to the current Canva page…");
-   for(const s of shapes){
-    const w=px(s.bottom),h=px(s.height);
-    if(x+w>pageWidth-margin){x=margin;y+=rowHeight+gap;rowHeight=0;}
-    if(y+h>pageHeight-margin) throw new Error("The shapes exceed this page's printable area. Remove some shapes or use a larger Canva page.");
-    if(s.kind==="Circle"){
-     const r=w/2,t=stroke;
-     await addElementAtPoint({type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:circlePath(r,t),fill:{color:"#222222"}}]});
-    }else{
-     const children=outlineChildren(s,stroke);
-     await addElementAtPoint({type:"group",top:y,left:x,width:w,height:h,children});
+   for(const item of placements){
+    const {shape,width,height}=item;
+    if(x+width>pageWidth-margin){x=margin;y+=rowHeight+gap;rowHeight=0;}
+    if(y+height>pageHeight-margin){
+     if(current.length) pages.push(current);
+     current=[];x=margin;y=margin;rowHeight=0;
     }
-    if(s.label) await addElementAtPoint({type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"});
-    x+=w+gap;rowHeight=Math.max(rowHeight,h);
+    current.push(...makeShapeElements(shape,x,y,stroke));
+    x+=width+gap;rowHeight=Math.max(rowHeight,height);
    }
-   setStatus("Export complete. All elements fit within the current page. Borders are editable vector shapes; center labels are separate text elements.");
+   if(current.length) pages.push(current);
+   if(!pages.length) throw new Error("No printable elements were generated.");
+   setStatus(`Adding ${shapes.length} shapes across ${pages.length} page(s)…`);
+   for(let pageIndex=0;pageIndex<pages.length;pageIndex++){
+    if(pageIndex===0){
+     for(const element of pages[pageIndex]) await addElementAtPoint(element);
+    }else{
+     await addPage({title:`Bharath Sports · ${pageIndex+1}`,elements:pages[pageIndex]});
+    }
+   }
+   setStatus(`Export complete. ${shapes.length} shapes placed across ${pages.length} page(s). Rectangles and circles are single editable shapes; each trapezium side and each center label is separate and editable.`);
   }catch(error){setStatus("Export stopped: "+(error instanceof Error?error.message:String(error)));}
   finally{setBusy(false);}
  };
+
  const remove=(id:number)=>setShapes(prev=>prev.filter(s=>s.id!==id));
  return <div className="app"><style>{css}</style>
   <header className="head"><div><h1>Bharath Sports</h1><div className="sub">Shape layout builder</div></div><span className="tag">Canva app</span></header>
@@ -110,7 +125,7 @@ export const App = () => {
    </div>
    <button className="primary" onClick={addShape}>Add shape</button>
   </section>
-  <section className="panel"><h2>2. Page layout · {shapes.length} shapes</h2><div className="preview">{shapes.length?shapes.map((s,i)=><div className="item" key={s.id}><span>{i+1}. {s.kind} · {s.bottom} × {s.height} cm{s.label?" · "+s.label:""}</span><button className="remove" onClick={()=>remove(s.id)}>Remove</button></div>):"Your shapes will appear here."}</div><p className="note">Dimensions convert from centimetres to Canva pixels (96 px per inch). Elements are packed into rows using the actual current page dimensions. If they do not fit, export stops with a clear message.</p></section>
-  <section className="panel"><h2>3. Canva export</h2><p className="note">Adds native editable vector outlines and separate center text to the currently open Canva design. Rectangle and trapezium borders are grouped so you can move the outline together or edit individual segments.</p><button className="primary" disabled={!shapes.length||busy||!canAdd} onClick={exportAll}>{busy?"Exporting…":"Add to Canva"}</button>{!canAdd&&<p className="note">This Canva design type does not support adding positioned elements.</p>}{status&&<p className="status" role="status">{status}</p>}</section>
+  <section className="panel"><h2>2. Page layout · {shapes.length} shapes</h2><div className="preview">{shapes.length?shapes.map((s,i)=><div className="item" key={s.id}><span>{i+1}. {s.kind} · {s.bottom} × {s.height} cm{s.label?" · "+s.label:""}</span><button className="remove" onClick={()=>remove(s.id)}>Remove</button></div>):"Your shapes will appear here."}</div><p className="note">Dimensions convert from centimetres to Canva pixels (96 px per inch). Elements are packed into rows using the current page dimensions. When a page fills, the remaining shapes continue automatically on new Canva pages.</p></section>
+  <section className="panel"><h2>3. Canva export</h2><p className="note">Adds editable shapes to the current Canva design. Rectangles and circles are single shape elements. Each trapezium side and center label is independent. Overflow continues onto new pages automatically.</p><button className="primary" disabled={!shapes.length||busy||!canAdd} onClick={exportAll}>{busy?"Exporting…":"Add to Canva"}</button>{!canAdd&&<p className="note">This Canva design type does not support adding positioned elements.</p>}{status&&<p className="status" role="status">{status}</p>}</section>
  </div>;
 };
