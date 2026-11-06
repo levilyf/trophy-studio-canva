@@ -87,7 +87,7 @@ export const App = () => {
  };
  const remove=(id:number)=>setShapes(prev=>prev.filter(s=>s.id!==id));
  return <div className="app"><style>{css}</style>
-  <header className="head"><div><h1>Trophy Studio</h1><div className="sub">Shape layout builder</div></div><span className="tag">Canva app</span></header>
+  <header className="head"><div><h1>Bharath Sports</h1><div className="sub">Shape layout builder</div></div><span className="tag">Canva app</span></header>
   <section className="panel"><h2>1. Create a shape</h2>
    <div className="tabs">{(["Trapezium","Rectangle","Circle"] as Kind[]).map(k=><button key={k} className={kind===k?"active":""} onClick={()=>setKind(k)}>{k}</button>)}</div>
    <div className="grid">
