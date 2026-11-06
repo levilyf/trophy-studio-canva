@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { addElementAtPoint } from "@canva/design";
+import { addElementAtPoint, getCurrentPageContext } from "@canva/design";
 import { useFeatureSupport } from "@canva/app-hooks";
 
 type Kind = "Trapezium" | "Rectangle" | "Circle";
@@ -64,13 +64,25 @@ export const App = () => {
  };
  const exportAll=async()=>{
   if(!shapes.length||!canAdd)return;
-  setBusy(true);setStatus("Adding editable elements to the current Canva page…");
+  setBusy(true);setStatus("Checking Canva page dimensions…");
   try{
-   let x=40,y=40,rowHeight=0;
-   const pageWidth=1000,gap=36,stroke=px(0.08);
+   const pageContext = await getCurrentPageContext();
+   const dimensions = pageContext.dimensions;
+   if (!dimensions) throw new Error("This design has no fixed page dimensions. Open a presentation or another fixed-size design.");
+   const margin=40,gap=36,stroke=px(0.08);
+   const pageWidth=dimensions.width,pageHeight=dimensions.height;
+   let x=margin,y=margin,rowHeight=0;
+   const placements = shapes.map((shape) => ({ shape, width:px(shape.bottom), height:px(shape.height) }));
+   for (const item of placements) {
+     if (item.width > pageWidth - margin*2 || item.height > pageHeight - margin*2) {
+       throw new Error(`A ${item.shape.kind.toLowerCase()} (${item.shape.bottom} × ${item.shape.height} cm) is larger than the available page area.`);
+     }
+   }
+   setStatus("Adding editable elements to the current Canva page…");
    for(const s of shapes){
     const w=px(s.bottom),h=px(s.height);
-    if(x+w>pageWidth){x=40;y+=rowHeight+gap;rowHeight=0;}
+    if(x+w>pageWidth-margin){x=margin;y+=rowHeight+gap;rowHeight=0;}
+    if(y+h>pageHeight-margin) throw new Error("The shapes exceed this page's printable area. Remove some shapes or use a larger Canva page.");
     if(s.kind==="Circle"){
      const r=w/2,t=stroke;
      await addElementAtPoint({type:"shape",top:y,left:x,width:w,height:h,viewBox:{top:0,left:0,width:w,height:h},paths:[{d:circlePath(r,t),fill:{color:"#222222"}}]});
@@ -81,7 +93,7 @@ export const App = () => {
     if(s.label) await addElementAtPoint({type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"});
     x+=w+gap;rowHeight=Math.max(rowHeight,h);
    }
-   setStatus("Export complete. Borders are editable vector shapes; each center label is a separate text element.");
+   setStatus("Export complete. All elements fit within the current page. Borders are editable vector shapes; center labels are separate text elements.");
   }catch(error){setStatus("Export stopped: "+(error instanceof Error?error.message:String(error)));}
   finally{setBusy(false);}
  };
@@ -98,7 +110,7 @@ export const App = () => {
    </div>
    <button className="primary" onClick={addShape}>Add shape</button>
   </section>
-  <section className="panel"><h2>2. Page layout · {shapes.length} shapes</h2><div className="preview">{shapes.length?shapes.map((s,i)=><div className="item" key={s.id}><span>{i+1}. {s.kind} · {s.bottom} × {s.height} cm{s.label?" · "+s.label:""}</span><button className="remove" onClick={()=>remove(s.id)}>Remove</button></div>):"Your shapes will appear here."}</div><p className="note">Dimensions convert from centimetres to Canva pixels (96 px per inch). Elements are placed in rows on the current page. This version does not create extra Canva pages automatically.</p></section>
+  <section className="panel"><h2>2. Page layout · {shapes.length} shapes</h2><div className="preview">{shapes.length?shapes.map((s,i)=><div className="item" key={s.id}><span>{i+1}. {s.kind} · {s.bottom} × {s.height} cm{s.label?" · "+s.label:""}</span><button className="remove" onClick={()=>remove(s.id)}>Remove</button></div>):"Your shapes will appear here."}</div><p className="note">Dimensions convert from centimetres to Canva pixels (96 px per inch). Elements are packed into rows using the actual current page dimensions. If they do not fit, export stops with a clear message.</p></section>
   <section className="panel"><h2>3. Canva export</h2><p className="note">Adds native editable vector outlines and separate center text to the currently open Canva design. Rectangle and trapezium borders are grouped so you can move the outline together or edit individual segments.</p><button className="primary" disabled={!shapes.length||busy||!canAdd} onClick={exportAll}>{busy?"Exporting…":"Add to Canva"}</button>{!canAdd&&<p className="note">This Canva design type does not support adding positioned elements.</p>}{status&&<p className="status" role="status">{status}</p>}</section>
  </div>;
 };
