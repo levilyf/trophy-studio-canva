@@ -76,8 +76,25 @@ function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
 function makeShapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
   const elements=shapeElements(s,x,y,stroke);
   const w=px(s.bottom),h=px(s.height);
-  if(s.label) elements.push({type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"});
-  return elements;
+  const output:any[]=[];
+  if(s.kind==="Trapezium") {
+    output.push({
+      type:"group",
+      top:y,left:x,width:w,height:h,
+      children:elements.map(element=>({
+        ...element,
+        top:element.top-y,
+        left:element.left-x,
+      })),
+    });
+  } else {
+    output.push(...elements);
+  }
+  if(s.label) output.push({
+    type:"text",children:[s.label],top:y+h/2-14,left:x,width:w,
+    fontSize:28,color:"#000000",textAlign:"center",fontWeight:"bold"
+  });
+  return output;
 }
 
 export const App = () => {
