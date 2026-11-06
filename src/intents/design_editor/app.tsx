@@ -44,7 +44,7 @@ function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
       viewBox:{top:0,left:0,width:w,height:h},
       paths:[{
         d:`M 0 0 H ${w} V ${h} H 0 Z`,
-        fill:{dropTarget:false,color:"#ffffff"},
+        fill:undefined,
         stroke:outline,
       }],
     }];
@@ -56,7 +56,7 @@ function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
       viewBox:{top:0,left:0,width:w,height:w},
       paths:[{
         d:`M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${w} A ${r} ${r} 0 1 1 ${r} 0 Z`,
-        fill:{dropTarget:false,color:"#ffffff"},
+        fill:undefined,
         stroke:outline,
       }],
     }];
@@ -68,7 +68,7 @@ function shapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
     viewBox:{top:0,left:0,width:w,height:h},
     paths:[{
       d:`M ${inset} 0 L ${inset+topWidth} 0 L ${w} ${h} L 0 ${h} Z`,
-      fill:{dropTarget:false,color:"#ffffff"},
+      fill:undefined,
       stroke:outline,
     }],
   }];
