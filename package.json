@@ -6,7 +6,7 @@
     "node": "^22 || ^24"
   },
   "scripts": {
-    "build": "canva apps build",
+    "build": "npx @canva/cli apps build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
