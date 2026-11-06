@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { addElementAtPoint, getCurrentPageContext } from "@canva/design";
+import { addElementAtPoint, addPage, getCurrentPageContext } from "@canva/design";
 import { useFeatureSupport } from "@canva/app-hooks";
 
 type Kind = "Trapezium" | "Rectangle" | "Circle";
@@ -60,7 +60,7 @@ function makeShapeElements(s:Shape,x:number,y:number,stroke:number):any[] {
 
 export const App = () => {
  const supported=useFeatureSupport();
- const canAdd=supported(addElementAtPoint);
+ const canAdd=supported(addElementAtPoint,addPage);
  const [kind,setKind]=useState<Kind>("Trapezium");
  const [top,setTop]=useState(""),[bottom,setBottom]=useState(""),[height,setHeight]=useState(""),[label,setLabel]=useState("");
  const [shapes,setShapes]=useState<Shape[]>([]);
