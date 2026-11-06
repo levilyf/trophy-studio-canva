@@ -54,7 +54,7 @@ export const App = () => {
  const supported=useFeatureSupport();
  const canAdd=supported(addElementAtPoint);
  const [kind,setKind]=useState<Kind>("Trapezium");
- const [top,setTop]=useState("17.2"),[bottom,setBottom]=useState("25.1"),[height,setHeight]=useState("29.5"),[label,setLabel]=useState("C");
+ const [top,setTop]=useState(""),[bottom,setBottom]=useState(""),[height,setHeight]=useState(""),[label,setLabel]=useState("");
  const [shapes,setShapes]=useState<Shape[]>([]);
  const [status,setStatus]=useState(""); const [busy,setBusy]=useState(false);
  const addShape=()=>{
